@@ -1,0 +1,7 @@
+#mp-card-form input, #mp-card-form select {
+    border: 1px solid #919191;
+    border-radius: 8px;
+}
+#mp-card-form select {
+    color: #777;
+}
