@@ -80,12 +80,26 @@ class MPM_Gateway_Card extends WC_Payment_Gateway {
         $application_fee = (float) get_option('mpm_application_fee', 0);
       	$customer_email = $order->get_billing_email();
 		error_log("Aqui 02");
-        // CPF vindo DIRETO do input visível
+        
         $cpf = preg_replace(
             '/\D/',
             '',
             $_POST['mp_identification_number'] ?? ''
         );
+        // $payer = [
+        //     'email' => $customer_email,
+        //     'identification' => [
+        //         'type'   => 'CPF',
+        //         'number' => $cpf
+        //     ]
+        // ];
+        $payer = [
+            'email' => $customer_email,
+            'identification' => [
+                'type'   => 'CPF',
+                'number' => $cpf
+            ]
+        ];
 		error_log("Aqui 03");
       	error_log(print_r($_POST,true));
         if ( empty( $cpf ) ) {
@@ -102,6 +116,7 @@ class MPM_Gateway_Card extends WC_Payment_Gateway {
             update_post_meta( $order_id, '_mp_idempotency_key', $existing_key );
         }
 		error_log("Aqui 05");
+        error_log(print_r($existing_key,true));
         $payment_data = [
             'transaction_amount' => (float) $order->get_total(),
             'token'              => $token,
@@ -109,17 +124,13 @@ class MPM_Gateway_Card extends WC_Payment_Gateway {
             'installments'       => $installments,
             'issuer_id'          => $issuer_id,
             'payment_method_id'  => $payment_method,
-            'payer' => [
-                'email' => $customer_email,
-                'identification' => [
-                    'type'   => 'CPF',
-                    'number' => $cpf
-                ]
-            ],
-            'application_fee' => $application_fee,
-            'binary_mode'     => true
+            'payer'              => $payer,
+            'application_fee'    => $application_fee,
+            'binary_mode'        => true,
+            'external_reference'=> 'ORDER_' . $order_id,
         ];
 		error_log("Aqui 06");
+        error_log(print_r($payment_data, true));
         $response = wp_remote_post(
             'https://api.mercadopago.com/v1/payments',
             [

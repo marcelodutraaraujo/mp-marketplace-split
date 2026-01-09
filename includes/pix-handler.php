@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 function mpm_create_pix_payment($order) {
-
+    $order_id = $order->id;
     $marketplace_token = get_option('mpm_access_token');
     $seller_id         = get_option('mpm_seller_id');
 
@@ -25,7 +25,7 @@ function mpm_create_pix_payment($order) {
         ],
         'application_fee' => $application_fee,
         'external_reference' => (string) $order->get_id(),
-        'seller_id' => (int) $seller_id,
+        //'seller_id' => (int) $seller_id,
     ];
 
     $response = wp_remote_post(
@@ -45,7 +45,7 @@ function mpm_create_pix_payment($order) {
     }
 
     $result = json_decode(wp_remote_retrieve_body($response), true);
-
+    error_log(print_r($result,true));
     if (!isset($result['id'])) {
         return ['error' => 'Erro ao criar pagamento PIX.'];
     }

@@ -1,26 +1,25 @@
 let cardFormInstance = null;
-let submitting = false;
+let mpReady = false;
 
 function initCardForm() {
 
     if (window.mpCardInitialized) return;
     window.mpCardInitialized = true;
 
-    if (!MP_CONFIG.public_key) {
-        console.error('Mercado Pago: Public Key não definida');
-        return;
-    }
-
     const mp = new MercadoPago(MP_CONFIG.public_key);
 
     cardFormInstance = mp.cardForm({
         amount: Number(MP_CONFIG.amount).toFixed(2),
         autoMount: true,
-        payer: {
-            email: MP_CONFIG.email
-        },
+        /*payer: {
+            email: MP_CONFIG.email,
+            identification: {
+              type: "CPF",
+              number: document.getElementById("mp_identification_number").value
+          }
+        },*/
         form: {
-            id: "mp-card-form", 
+            id: "mp-card-form", // DIV
             cardholderName: { id: "mp_cardholder_name" },
             cardNumber: { id: "mp_card_number" },
             expirationDate: { id: "mp_expiration_date" },
@@ -30,69 +29,73 @@ function initCardForm() {
             identificationNumber: { id: "mp_identification_number" }
         },
         callbacks: {
-
             onFormMounted: error => {
-                if (error) {
-                    console.error('Erro ao montar formulário:', error);
-                }
-            },
-
-            // 🔥 ESTE onSubmit É DO MP (não do Woo)
-            onSubmit: event => {
-                event.preventDefault();
-
-                if (submitting) return;
-
-                const data = cardFormInstance.getCardFormData();
-                console.log('MP data:', data);
-
-                if (!data.token) {
-                    alert('Não foi possível gerar o token do cartão');
-                    submitting = false;
-                    return;
-                }
-
-                // Preenche hidden inputs (já no form.checkout)
-                jQuery('#mp_token').val(data.token);
-                jQuery('#mp_payment_method').val(data.paymentMethodId);
-                jQuery('#mp_installments').val(data.installments);
-                jQuery('#mp_issuer_id').val(data.issuerId);
-
-                submitting = true;
-
-                // Agora sim envia o checkout real
-                jQuery('form.checkout')[0].submit();
+                if (error) console.error(error);
             }
         }
     });
 }
 
 jQuery(function ($) {
-
-    setTimeout(initCardForm, 3000);
-
-    $('form.checkout').on('change', 'input[name="payment_method"]', function () {
+  	
+  	if( $('form.checkout #payment_method_mp_marketplace_card').attr('checked') ){
+  		setTimeout(initCardForm, 3000);
+      console.log('testando aqui');
+    }
+  
+  	$('form.checkout').on('change', 'input[name="payment_method"]', function () {
         if (this.value === 'mp_marketplace_card') {
             setTimeout(initCardForm, 300);
+          console.log('testando aqui');
         }
     });
 
-    // Intercepta submit do WooCommerce
-    $('form.checkout').on('submit', function (e) {
+    /**
+     * EVENTO CORRETO DO WOO
+     */
+    $('form.checkout').on(
+        'submit',
+        function (e) {
+			e.preventDefault()
+          	
+            if ($('input[name="payment_method"]:checked').val() !== 'mp_marketplace_card') {
+              return true;
+          	}
+          
+            // Já temos token → libera checkout
+            if (mpReady) {
+                return true;
+            }
 
-        if ($('input[name="payment_method"]:checked').val() !== 'mp_marketplace_card') {
-            return true;
+            // Gera token antes do AJAX
+          	//console.log('aquiiii01')
+            cardFormInstance.createCardToken();
+			//console.log('aquiiii02')
+            const interval = setInterval(() => {
+
+                const data = cardFormInstance.getCardFormData();
+                console.log('MP DATA:', data);
+
+                if (!data.token) return;
+
+                clearInterval(interval);
+
+                // Preenche inputs
+                $('#mp_token').val(data.token);
+                $('#mp_payment_method').val(data.paymentMethodId);
+                $('#mp_installments').val(data.installments);
+                $('#mp_issuer_id').val(data.issuerId);
+
+                mpReady = true;
+
+                // DISPARA O CHECKOUT DE NOVO
+               	$('form.checkout').submit();
+
+            }, 1500);
+
+            // BLOQUEIA envio original
+            return false;
         }
-
-        if (submitting) {
-            return true;
-        }
-
-        e.preventDefault();
-
-        // GERA TOKEN (NÃO submit)
-        cardFormInstance.createCardToken();
-        
-    });
+    );
 
 });
